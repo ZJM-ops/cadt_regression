@@ -1,0 +1,22 @@
+{
+  "source_domain": 50,
+  "target_domain": 79,
+  "dataset": "dailyeeg",
+  "task_type": "regression",
+  "seq_len": 2000,
+  "batch_size": 32,
+  "n_epoch": 351,
+  "best_target_score": 0.01763362151190676,
+  "best_mse": 0.6441282750118391,
+  "best_r2": 0.18960332526671644,
+  "best_pearson": 0.5102965108302348,
+  "best_spearman": 0.487699598280931,
+  "best_domain_precision": 0.6666666666666666,
+  "timestamp": "20260709_120024",
+  "args": {
+    "ball_loss_weight": 10.0,
+    "discriminator_loss": 1.0,
+    "n_clusters": 6,
+    "device": 0
+  }
+}

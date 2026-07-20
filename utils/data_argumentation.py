@@ -45,15 +45,16 @@ def segment_noise(input_x, var=0.1):
 
 def data_argumentation(input_x, series_length=10, sub_seq_length=1):
     input_num = input_x.shape[0]
+    actual_length = input_x.shape[2]
     r = []
     for i in range(input_num):
         t = random.random()
         if t < 0.1:
             r.append(segment_noise(input_x[i]))
         elif t < 0.4:
-            r.append(segment_shuffle(input_x[i], series_length, sub_seq_length))
+            r.append(segment_shuffle(input_x[i], actual_length, max(1, actual_length // 20)))
         elif t < 0.7:
-            r.append(segment_exchange(input_x[i], series_length, sub_seq_length))
+            r.append(segment_exchange(input_x[i], actual_length, max(1, actual_length // 20)))
         else:
-            r.append(segment_remove(input_x[i], series_length, sub_seq_length))
+            r.append(segment_remove(input_x[i], actual_length, max(1, actual_length // 20)))
     return torch.stack(r).cuda()

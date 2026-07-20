@@ -3,7 +3,6 @@ import zipfile
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
-import tensorflow as tf
 
 
 def one_to_n(n):
@@ -599,5 +598,136 @@ class Wisdm_ar_data(Dataset):
         return data, label
 
 
+class DailyEEG_data(Dataset):
+    """
+    DailyEEG 情绪回归数据集，从 align_cadt_input.py 生成的 NPY 文件加载。
+    每个样本:
+      - x: (seq_len, n_channels) 原始 EEG 片段
+      - y: (n_labels,) 11 维情绪回归标签
+    """
+    def __init__(self, domain_ids, data_dir="/root/cadt_test_code/processed_cadt", id_map=None):
+        import os
+        x_path = os.path.join(data_dir, "X.npy")
+        y_path = os.path.join(data_dir, "y.npy")
+        d_path = os.path.join(data_dir, "d.npy")
+        all_x = np.load(x_path).astype(np.float32)
+        all_y = np.load(y_path).astype(np.float32)
+        all_d = np.load(d_path).astype(np.int64)
+        if all_y.ndim == 1:
+            all_y = all_y.reshape(-1, 1)
+        domain_set = set(domain_ids)
+        mask = np.isin(all_d, list(domain_set))
+        self.x = all_x[mask]
+        self.y = all_y[mask]
+        self.d = all_d[mask]
+        if id_map is not None:
+            self.d = np.array([id_map[int(d)] for d in self.d], dtype=np.int64)
+        if len(self.x) == 0:
+            raise ValueError(
+                f"域 {domain_ids} 在 {data_dir} 中没有匹配样本，"
+                f"可用域范围 [{all_d.min()}, {all_d.max()}]"
+            )
+        print(f"DailyEEG_data: domains={domain_ids}, samples={len(self.x)}, "
+              f"x={self.x.shape}, y={self.y.shape}")
+    def __len__(self):
+        return len(self.x)
+    def __getitem__(self, index):
+        data = norm(self.x[index])
+        label = self.y[index].astype(np.float32)
+        domain = self.d[index]
+        return data, label, domain
+
+
+class MultiSourceBatchSampler:
+    """
+    多源域Batch采样器：从每个源域取相同数量的样本组成一个batch。
+    
+    用法:
+        dataset = DailyEEG_data([6, 12, 18])
+        sampler = MultiSourceBatchSampler(dataset.d, [6, 12, 18], batch_size=32)
+        loader = DataLoader(dataset, batch_sampler=sampler)
+    
+    参数:
+        domain_labels: 每个样本的域标签数组，shape=(n_samples,)
+        source_domains: 源域ID列表，如 [6, 12, 18]
+        batch_size: 总的batch大小
+    
+    特性:
+        - 每个源域贡献 batch_size // n_domains 个样本
+        - 如果batch_size不能被源域数量整除，实际batch大小为 (batch_size // n_domains) * n_domains
+        - 数据量少的源域自动循环采样（使用itertools.cycle）
+        - 支持任意数量的源域
+    """
+    def __init__(self, domain_labels, source_domains, batch_size):
+        self.source_domains = source_domains
+        self.n_domains = len(source_domains)
+        self.total_batch_size = batch_size
+        self.per_domain_batch = batch_size // self.n_domains
+        
+        if self.per_domain_batch == 0:
+            raise ValueError(
+                f"batch_size={batch_size} 小于源域数量={self.n_domains}，"
+                f"请增大batch_size或减少源域数量"
+            )
+        
+        # 实际batch大小
+        self.actual_batch_size = self.per_domain_batch * self.n_domains
+        
+        # 为每个源域收集样本索引
+        self.domain_indices = {}
+        for domain in source_domains:
+            indices = np.where(domain_labels == domain)[0].tolist()
+            if len(indices) == 0:
+                raise ValueError(f"源域 {domain} 没有样本")
+            self.domain_indices[domain] = indices
+            print(f"  源域 {domain}: {len(indices)} 个样本")
+        
+        print(f"MultiSourceBatchSampler: {self.n_domains} 个源域, "
+              f"总batch_size={batch_size}, 实际batch_size={self.actual_batch_size}, "
+              f"每域样本数={self.per_domain_batch}")
+        
+        # 计算一个epoch的batch数量（基于最大的源域）
+        max_samples = max(len(indices) for indices in self.domain_indices.values())
+        self.n_batches = max_samples // self.per_domain_batch
+        
+        if self.n_batches == 0:
+            raise ValueError(
+                f"某个源域样本数不足 {self.per_domain_batch}，无法组成一个batch"
+            )
+    
+    def __iter__(self):
+        import itertools
+        
+        # 为每个源域创建随机打乱的迭代器（循环使用）
+        domain_iterators = {}
+        for domain, indices in self.domain_indices.items():
+            # 每次迭代前打乱
+            shuffled_indices = indices.copy()
+            np.random.shuffle(shuffled_indices)
+            # 创建循环迭代器
+            domain_iterators[domain] = itertools.cycle(shuffled_indices)
+        
+        # 生成batch
+        for _ in range(self.n_batches):
+            batch_indices = []
+            for domain in self.source_domains:
+                # 从每个源域取per_domain_batch个样本
+                for _ in range(self.per_domain_batch):
+                    batch_indices.append(next(domain_iterators[domain]))
+            yield batch_indices
+    
+    def __len__(self):
+        return self.n_batches
+
+
+def get_available_domains(data_dir="/root/cadt_test_code/processed_cadt"):
+    """
+    Reads d.npy directly instead of assuming a contiguous 0..N range --
+    domain 124 is confirmed missing, and there may be other gaps.
+    """
+    import os
+    d_path = os.path.join(data_dir, "d.npy")
+    all_d = np.load(d_path)
+    return sorted(np.unique(all_d).tolist())
 
 
