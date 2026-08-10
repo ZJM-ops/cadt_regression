@@ -1,3 +1,4 @@
+#dataset.py
 import tarfile
 import zipfile
 import numpy as np
@@ -18,6 +19,11 @@ def norm(z):
     # print(np.mean(z, axis=0).shape)
     z = (z - np.mean(z, axis=0)) / (np.std(z, axis=0) + 1e-6)
     return z
+
+
+def norm_with_stats(z, mean, std):
+    """Normalize with pre-computed statistics."""
+    return (z - mean) / (std + 1e-6)
 
 
 class Dataset1:
@@ -604,8 +610,22 @@ class DailyEEG_data(Dataset):
     每个样本:
       - x: (seq_len, n_channels) 原始 EEG 片段
       - y: (n_labels,) 11 维情绪回归标签
+      - d: 域 ID
+      - sub_id: 被试编号
+      - day_id: 天/session 编号
     """
-    def __init__(self, domain_ids, data_dir="/root/cadt_test_code/processed_cadt", id_map=None):
+    def __init__(self, domain_ids, data_dir="/root/zjm/cadt_test_code/processed_cadt", id_map=None,
+                 norm_mode="sample"):
+        """
+        Args:
+            domain_ids: 域 ID 列表
+            data_dir: NPY 数据目录
+            id_map: 域 ID 映射
+            norm_mode: 标准化模式
+                - "sample": 逐样本独立标准化（默认）
+                - "day": 按天标准化
+                - "subject": 按被试标准化
+        """
         import os
         x_path = os.path.join(data_dir, "X.npy")
         y_path = os.path.join(data_dir, "y.npy")
@@ -613,26 +633,124 @@ class DailyEEG_data(Dataset):
         all_x = np.load(x_path).astype(np.float32)
         all_y = np.load(y_path).astype(np.float32)
         all_d = np.load(d_path).astype(np.int64)
+        
+        # 加载被试信息
+        sub_path = os.path.join(data_dir, "sub.npy")
+        if os.path.exists(sub_path):
+            self.all_sub = np.load(sub_path).astype(np.int64)
+        else:
+            self.all_sub = None
+        
+        # 加载 meta.json 获取域偏移映射
+        meta_path = os.path.join(data_dir, "meta.json")
+        self.domain_offset_map = {}
+        self.domains_per_subject_map = {}
+        if os.path.exists(meta_path):
+            import json
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+            self.domain_offset_map = {int(k): v for k, v in meta.get('domain_offset_map', {}).items()}
+            self.domains_per_subject_map = {int(k): v for k, v in meta.get('domains_per_subject_map', {}).items()}
+        
         if all_y.ndim == 1:
             all_y = all_y.reshape(-1, 1)
         domain_set = set(domain_ids)
-        mask = np.isin(all_d, list(domain_set))
+        mask = np.isin(all_d, list(domain_set)) #筛选需要的domain_id
         self.x = all_x[mask]
         self.y = all_y[mask]
         self.d = all_d[mask]
+        self.norm_mode = norm_mode
+        
+        if self.all_sub is not None:
+            self.sub = self.all_sub[mask]
+            # 计算 day_id
+            self.day = np.zeros_like(self.d)
+            for sub_id, offset in self.domain_offset_map.items():
+                sub_mask = self.sub == sub_id
+                self.day[sub_mask] = self.d[sub_mask] - offset
+        else:
+            self.sub = None
+            self.day = None
+            
         if id_map is not None:
             self.d = np.array([id_map[int(d)] for d in self.d], dtype=np.int64)
+        
+        # 预计算标准化统计量
+        if norm_mode == "day":
+            print(f"  预计算按天标准化统计量...")
+            self._precompute_day_norm(all_x, all_d, mask)
+        elif norm_mode == "subject":
+            print(f"  预计算按被试标准化统计量...")
+            self._precompute_subject_norm(all_x, all_d, mask)
+        
         if len(self.x) == 0:
             raise ValueError(
                 f"域 {domain_ids} 在 {data_dir} 中没有匹配样本，"
                 f"可用域范围 [{all_d.min()}, {all_d.max()}]"
             )
+        norm_desc = {"sample": "逐样本", "day": "按天", "subject": "按被试"}
         print(f"DailyEEG_data: domains={domain_ids}, samples={len(self.x)}, "
-              f"x={self.x.shape}, y={self.y.shape}")
+              f"x={self.x.shape}, y={self.y.shape}, norm={norm_desc.get(norm_mode, norm_mode)}")
+    
+    def _precompute_day_norm(self, all_x, all_d, mask):
+        """预计算每个 (被试, 天) 组合的均值和标准差"""
+        unique_domains = np.unique(all_d)
+        self.day_mean = {}
+        self.day_std = {}
+        
+        for domain_id in unique_domains:
+            domain_mask = all_d == domain_id
+            day_data = all_x[domain_mask]
+            mean = day_data.mean(axis=(0, 1))
+            std = day_data.std(axis=(0, 1))
+            std = np.maximum(std, 1e-6)
+            self.day_mean[domain_id] = mean
+            self.day_std[domain_id] = std
+        
+        # 为选中的样本分配统计量
+        selected_indices = np.where(mask)[0]
+        self._norm_mean = np.zeros_like(self.x)
+        self._norm_std = np.zeros_like(self.x)
+        for i, idx in enumerate(selected_indices):
+            domain_id = all_d[idx]
+            self._norm_mean[i] = self.day_mean.get(domain_id, 0)
+            self._norm_std[i] = self.day_std.get(domain_id, 1)
+    
+    def _precompute_subject_norm(self, all_x, all_d, mask):
+        """预计算每个被试的均值和标准差"""
+        if self.all_sub is None:
+            raise ValueError("subject norm mode requires sub.npy file")
+        
+        unique_subjects = np.unique(self.all_sub)
+        self.sub_mean = {}
+        self.sub_std = {}
+        
+        for sub_id in unique_subjects:
+            sub_mask = self.all_sub == sub_id
+            sub_data = all_x[sub_mask]
+            mean = sub_data.mean(axis=(0, 1))
+            std = sub_data.std(axis=(0, 1))
+            std = np.maximum(std, 1e-6)
+            self.sub_mean[sub_id] = mean
+            self.sub_std[sub_id] = std
+        
+        # 为选中的样本分配统计量
+        selected_indices = np.where(mask)[0]
+        self._norm_mean = np.zeros_like(self.x)
+        self._norm_std = np.zeros_like(self.x)
+        for i, idx in enumerate(selected_indices):
+            sub_id = self.all_sub[idx]
+            self._norm_mean[i] = self.sub_mean.get(sub_id, 0)
+            self._norm_std[i] = self.sub_std.get(sub_id, 1)
+    
     def __len__(self):
         return len(self.x)
+    
     def __getitem__(self, index):
-        data = norm(self.x[index])
+        if self.norm_mode == "sample":
+            data = norm(self.x[index])
+        else:
+            data = norm_with_stats(self.x[index], self._norm_mean[index], self._norm_std[index])
         label = self.y[index].astype(np.float32)
         domain = self.d[index]
         return data, label, domain
@@ -720,7 +838,7 @@ class MultiSourceBatchSampler:
         return self.n_batches
 
 
-def get_available_domains(data_dir="/root/cadt_test_code/processed_cadt"):
+def get_available_domains(data_dir="/root/zjm/cadt_test_code/processed_cadt"):
     """
     Reads d.npy directly instead of assuming a contiguous 0..N range --
     domain 124 is confirmed missing, and there may be other gaps.
@@ -729,5 +847,201 @@ def get_available_domains(data_dir="/root/cadt_test_code/processed_cadt"):
     d_path = os.path.join(data_dir, "d.npy")
     all_d = np.load(d_path)
     return sorted(np.unique(all_d).tolist())
+
+
+def load_emotion_split(split_dir, split_mode, split_type):
+    """
+    Load emotion project's split JSON file which contains sample indices.
+    
+    Args:
+        split_dir: Path to splits directory (e.g., "/vePFS-0x0d/DailyEEG/splits_new")
+        split_mode: One of "cross_subject", "cross_day", "within_subject_day"
+        split_type: One of "pretrain", "finetune", "val", "test"
+    
+    Returns:
+        List of sample indices (integers)
+    """
+    import json
+    import os
+    if split_type in ["pretrain", "finetune"]:
+        json_path = os.path.join(split_dir, split_mode, f"{split_type}.json")
+    else:
+        json_path = os.path.join(split_dir, split_mode, f"{split_type}.json")
+    
+    if not os.path.exists(json_path):
+        raise FileNotFoundError(f"Split file not found: {json_path}")
+    
+    with open(json_path, 'r') as f:
+        indices = json.load(f)
+    
+    return indices
+
+
+class DailyEEG_SplitData(Dataset):
+    """
+    DailyEEG 数据集，使用 emotion 项目生成的样本索引划分。
+    
+    根据不同的 split_mode，域的定义会不同：
+    - cross_subject: 域 = subject（每个被试作为一个域）
+    - cross_day: 域 = (subject, day)（每个被试-天对作为一个域）
+    - within_subject_day: 域 = (subject, day)（每个被试-天对作为一个域）
+    
+    用法示例:
+        # 使用 cross_subject 模式
+        train_indices = load_emotion_split("vePFS-0x0d/DailyEEG/splits_new", "cross_subject", "pretrain")
+        train_indices += load_emotion_split("vePFS-0x0d/DailyEEG/splits_new", "cross_subject", "finetune")
+        data_train = DailyEEG_SplitData(train_indices, split_mode="cross_subject", data_dir="vePFS-0x0d/DailyEEG/processed_cadt_addtime_new")
+    """
+    def __init__(self, sample_indices, split_mode="cross_subject", data_dir="/root/zjm/cadt_test_code/processed_cadt",
+                 norm_mode="sample"):
+        """
+        Args:
+            sample_indices: 样本索引列表
+            split_mode: cross_subject, cross_day, within_subject_day
+            data_dir: NPY 数据目录
+            norm_mode: 标准化模式
+                - "sample": 逐样本独立标准化（默认）
+                - "day": 按天标准化（每个被试的每一天使用该天所有样本统计量）
+                - "subject": 按被试标准化（每个被试使用该被试所有样本统计量）
+        """
+        import os
+        x_path = os.path.join(data_dir, "X.npy")
+        y_path = os.path.join(data_dir, "y.npy")
+        d_path = os.path.join(data_dir, "d.npy")
+        
+        all_x = np.load(x_path).astype(np.float32)
+        all_y = np.load(y_path).astype(np.float32)
+        all_d = np.load(d_path).astype(np.int64)
+        
+        sub_path = os.path.join(data_dir, "sub.npy")
+        if os.path.exists(sub_path):
+            self.all_sub = np.load(sub_path).astype(np.int64)
+        else:
+            self.all_sub = None
+        
+        meta_path = os.path.join(data_dir, "meta.json")
+        self.domain_offset_map = {}
+        self.domains_per_subject_map = {}
+        if os.path.exists(meta_path):
+            import json
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+            self.domain_offset_map = {int(k): v for k, v in meta.get('domain_offset_map', {}).items()}
+            self.domains_per_subject_map = {int(k): v for k, v in meta.get('domains_per_subject_map', {}).items()}
+        
+        if all_y.ndim == 1:
+            all_y = all_y.reshape(-1, 1)
+        
+        sample_indices = np.asarray(sample_indices, dtype=np.int64)
+        max_index = len(all_x) - 1
+        invalid_mask = (sample_indices < 0) | (sample_indices > max_index)
+        if np.any(invalid_mask):
+            invalid_indices = sample_indices[invalid_mask]
+            raise ValueError(
+                f"Invalid sample indices: {invalid_indices[:10]} (max valid index={max_index})"
+            )
+        
+        self.x = all_x[sample_indices]
+        self.y = all_y[sample_indices]
+        self.sub = self.all_sub[sample_indices] if self.all_sub is not None else None
+        self.norm_mode = norm_mode
+        
+        # 根据 split_mode 确定域的定义
+        if split_mode == "cross_subject":
+            # 跨被试模式：域 = subject，每个被试作为一个独立的域
+            if self.sub is None:
+                raise ValueError("cross_subject mode requires sub.npy file")
+            self.d = self.sub.copy()
+            self.day = None
+        else:
+            # cross_day 和 within_subject_day：域 = (subject, day)，使用原始的 d.npy
+            self.d = all_d[sample_indices]
+            if self.sub is not None:
+                self.day = np.zeros_like(self.d)
+                for sub_id, offset in self.domain_offset_map.items():
+                    sub_mask = self.sub == sub_id
+                    self.day[sub_mask] = self.d[sub_mask] - offset
+            else:
+                self.day = None
+        
+        # 预计算标准化统计量
+        if norm_mode == "day":
+            # 按天标准化：使用完整数据中每个 (被试, 天) 的统计量
+            print(f"  预计算按天标准化统计量...")
+            self._precompute_day_norm(all_x, all_d)
+        elif norm_mode == "subject":
+            # 按被试标准化：使用完整数据中每个被试的统计量
+            print(f"  预计算按被试标准化统计量...")
+            self._precompute_subject_norm(all_x, all_d)
+        
+        norm_desc = {"sample": "逐样本", "day": "按天", "subject": "按被试"}
+        print(f"DailyEEG_SplitData ({split_mode}): {len(sample_indices)} samples, "
+              f"x={self.x.shape}, y={self.y.shape}, "
+              f"domain range [{self.d.min()}, {self.d.max()}], "
+              f"norm={norm_desc.get(norm_mode, norm_mode)}")
+    
+    def _precompute_day_norm(self, all_x, all_d):
+        """预计算每个 (被试, 天) 组合的均值和标准差"""
+        # 计算每个域 ID 的均值和标准差
+        unique_domains = np.unique(all_d)
+        self.day_mean = {}
+        self.day_std = {}
+        
+        for domain_id in unique_domains:
+            mask = all_d == domain_id
+            day_data = all_x[mask]  # (n_samples, 2000, 59)
+            # 计算该天所有样本合并后的均值和标准差（沿时间轴和样本轴）
+            mean = day_data.mean(axis=(0, 1))  # (59,)
+            std = day_data.std(axis=(0, 1))    # (59,)
+            std = np.maximum(std, 1e-6)  # 防止标准差为0
+            self.day_mean[domain_id] = mean
+            self.day_std[domain_id] = std
+        
+        # 为每个样本分配对应的统计量
+        self._norm_mean = np.zeros_like(self.x)
+        self._norm_std = np.zeros_like(self.x)
+        for i in range(len(self.x)):
+            domain_id = self.d[i]
+            self._norm_mean[i] = self.day_mean.get(domain_id, 0)
+            self._norm_std[i] = self.day_std.get(domain_id, 1)
+    
+    def _precompute_subject_norm(self, all_x, all_d):
+        """预计算每个被试的均值和标准差"""
+        if self.all_sub is None:
+            raise ValueError("subject norm mode requires sub.npy file")
+        
+        unique_subjects = np.unique(self.all_sub)
+        self.sub_mean = {}
+        self.sub_std = {}
+        
+        for sub_id in unique_subjects:
+            mask = self.all_sub == sub_id
+            sub_data = all_x[mask]  # (n_samples, 2000, 59)
+            mean = sub_data.mean(axis=(0, 1))  # (59,)
+            std = sub_data.std(axis=(0, 1))    # (59,)
+            std = np.maximum(std, 1e-6)
+            self.sub_mean[sub_id] = mean
+            self.sub_std[sub_id] = std
+        
+        # 为每个样本分配对应的统计量
+        self._norm_mean = np.zeros_like(self.x)
+        self._norm_std = np.zeros_like(self.x)
+        for i in range(len(self.x)):
+            sub_id = self.sub[i]
+            self._norm_mean[i] = self.sub_mean.get(sub_id, 0)
+            self._norm_std[i] = self.sub_std.get(sub_id, 1)
+    
+    def __len__(self):
+        return len(self.x)
+    
+    def __getitem__(self, index):
+        if self.norm_mode == "sample":
+            data = norm(self.x[index])
+        else:
+            # 使用预计算的统计量
+            data = norm_with_stats(self.x[index], self._norm_mean[index], self._norm_std[index])
+        label = self.y[index].astype(np.float32)
+        domain = self.d[index]
+        return data, label, domain
 
 
