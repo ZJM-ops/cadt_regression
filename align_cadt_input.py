@@ -31,13 +31,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir",
         type=str,
-        default="/vePFS-0x0d/DailyEEG/de_output_addtime_new",
+        default="/vePFS-0x0d/home/zjm/de_output_addtime_new",
         help="test_load.py 输出的 H5 目录",
     )
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="/vePFS-0x0d/DailyEEG/processed_cadt_addtime_new",
+        default="/vePFS-0x0d/home/zjm/processed_cadt_addtime_new",
         help="CADT 对齐后的 NPY 保存目录",
     )
     parser.add_argument("--seq-len", type=int, default=2000, help="CADT 时序长度，2000=10秒@200Hz")
