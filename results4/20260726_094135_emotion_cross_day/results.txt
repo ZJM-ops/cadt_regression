@@ -1,0 +1,51 @@
+=== CADT Training Results ===
+Timestamp: 20260726_094135
+Split Mode: cross_day
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: 12
+Target Domain IDs: [110, 115]
+Number of Source Domains: 6
+Best Epoch: 190
+
+--- Domain Information ---
+Training domains (raw IDs): [111, 113, 114, 116, 117, 119]
+Training domain counts: {111: 253, 113: 184, 114: 207, 116: 207, 117: 184, 119: 230}
+Validation domains (raw IDs): [110, 115]
+Validation domain counts: {110: 253, 115: 230}
+Test domains (raw IDs): [112, 118]
+Test domain counts: {112: 230, 118: 253}
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.423565
+Val MAE: 0.470183
+Val RMSE: 0.650819
+Val R2: 0.389370
+Val Avg R2 (per-dim): -0.338600
+Val Pearson: 0.025677
+Val Spearman: 0.031310
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.573858
+Test MAE: 0.519437
+Test RMSE: 0.757534
+Test R2: 0.113033
+Test Avg R2 (per-dim): -0.247714
+Test Pearson: 0.009733
+Test Spearman: 0.023063
+
+--- Per-Emotion Metrics ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         0.8103     0.7293    -0.0086    -0.0698    -0.0466
+alert            0.8029     0.5990    -0.3764    -0.0478    -0.0426
+determined       1.3310     0.9154    -0.3011    -0.0012     0.0017
+attentive        1.8354     1.0683    -0.3755     0.0214    -0.0036
+active           1.0968     0.8913    -0.0336     0.0510     0.0397
+hostile          0.6439     0.4242    -0.2623     0.0311    -0.0003
+nervous          0.9096     0.7308    -0.1509     0.0043    -0.0183
+upset            1.3875     0.8930    -0.3706    -0.0507    -0.0359
+afraid           0.7851     0.6136    -0.1246     0.0263     0.0536
+ashamed          0.4881     0.4172    -0.1725     0.0760     0.0722
+fatigue          1.3954     0.9367    -0.5487     0.0332     0.0146
+----------------------------------------------------------------------
+Average          1.0442     0.7472    -0.2477     0.0067     0.0031

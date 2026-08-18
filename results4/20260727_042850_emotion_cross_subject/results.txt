@@ -1,0 +1,56 @@
+=== CADT Training Results ===
+Timestamp: 20260727_042850
+Split Mode: cross_subject
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: all subjects
+Target Domain IDs: [3, 5, 13]
+Number of Source Domains: 9
+Best Epoch: 24
+
+--- Domain Information ---
+Training domains (raw IDs): [1, 4, 6, 7, 8, 10, 11, 12, 15]
+Training domain counts: {1: 1794, 4: 1035, 6: 2346, 7: 2093, 8: 2024, 10: 2369, 11: 1794, 12: 2231, 15: 1955}
+Validation domains (raw IDs): [3, 5, 13]
+Validation domain counts: {3: 1633, 5: 1978, 13: 1495}
+Test domains (raw IDs): [2, 9, 14]
+Test domain counts: {2: 1886, 9: 1978, 14: 2208}
+
+--- Subject Information (cross_subject mode) ---
+Training subjects: [1, 4, 6, 7, 8, 10, 11, 12, 15] (total 9)
+Validation subjects: [3, 5, 13] (total 3)
+Test subjects: [2, 9, 14] (total 3)
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.956857
+Val MAE: 0.778548
+Val RMSE: 0.978191
+Val R2: 0.213145
+Val Avg R2 (per-dim): -0.029366
+Val Pearson: 0.001539
+Val Spearman: 0.001487
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.733414
+Test MAE: 0.712014
+Test RMSE: 0.856396
+Test R2: 0.065116
+Test Avg R2 (per-dim): -0.242474
+Test Pearson: -0.028051
+Test Spearman: -0.026770
+
+--- Per-Emotion Metrics ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         0.9768     0.8787    -0.6379     0.0953     0.1081
+alert            0.5572     0.6892    -0.2449    -0.1210    -0.1453
+determined       0.8874     0.8336    -0.8020     0.0024     0.0620
+attentive        1.2836     0.8874    -0.1466    -0.0162    -0.0367
+active           0.9725     0.8260    -0.1816     0.1566     0.1740
+hostile          0.3583     0.5154    -0.1891    -0.0849    -0.1312
+nervous          0.5823     0.6794    -0.1422    -0.0792    -0.0835
+upset            0.9368     0.8111    -0.0064    -0.0817    -0.0887
+afraid           0.3689     0.5673    -0.3077    -0.1290    -0.1662
+ashamed          0.3474     0.4696    -0.0084    -0.0579     0.0069
+fatigue          0.7964     0.6744    -0.0004     0.0072     0.0062
+----------------------------------------------------------------------
+Average          0.7334     0.7120    -0.2425    -0.0281    -0.0268

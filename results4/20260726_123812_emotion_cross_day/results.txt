@@ -1,0 +1,51 @@
+=== CADT Training Results ===
+Timestamp: 20260726_123812
+Split Mode: cross_day
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: 15
+Target Domain IDs: [143, 149]
+Number of Source Domains: 6
+Best Epoch: 81
+
+--- Domain Information ---
+Training domains (raw IDs): [141, 144, 145, 147, 148, 150]
+Training domain counts: {141: 161, 144: 161, 145: 207, 147: 207, 148: 207, 150: 184}
+Validation domains (raw IDs): [143, 149]
+Validation domain counts: {143: 230, 149: 207}
+Test domains (raw IDs): [142, 146]
+Test domain counts: {142: 184, 146: 207}
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.348976
+Val MAE: 0.460328
+Val RMSE: 0.590742
+Val R2: -0.071232
+Val Avg R2 (per-dim): -0.351863
+Val Pearson: 0.052234
+Val Spearman: 0.059938
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.469423
+Test MAE: 0.504120
+Test RMSE: 0.685144
+Test R2: -0.109587
+Test Avg R2 (per-dim): -0.269435
+Test Pearson: 0.022667
+Test Spearman: 0.020971
+
+--- Per-Emotion Metrics ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         0.8502     0.7570    -0.0583    -0.0534    -0.0874
+alert            0.8120     0.7713    -0.3919     0.0161    -0.0003
+determined       1.0344     0.8579    -0.0112     0.1218     0.1606
+attentive        1.6444     1.0437    -0.2323    -0.0383    -0.0324
+active           1.2125     0.9076    -0.1426     0.0268     0.0321
+hostile          0.6357     0.7058    -0.2461     0.1492     0.0756
+nervous          1.2452     1.0031    -0.5755     0.0278     0.0534
+upset            1.1400     0.9253    -0.1261     0.0882     0.1124
+afraid           1.1079     0.9504    -0.5869     0.0160    -0.0287
+ashamed          0.6525     0.7207    -0.5674    -0.0506    -0.0922
+fatigue          0.9239     0.7805    -0.0254     0.0558     0.1328
+----------------------------------------------------------------------
+Average          1.0235     0.8567    -0.2694     0.0327     0.0296

@@ -1,0 +1,51 @@
+=== CADT Training Results ===
+Timestamp: 20260726_111133
+Split Mode: cross_day
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: 13
+Target Domain IDs: [120, 128]
+Number of Source Domains: 6
+Best Epoch: 27
+
+--- Domain Information ---
+Training domains (raw IDs): [122, 123, 125, 127, 129, 130]
+Training domain counts: {122: 115, 123: 115, 125: 115, 127: 184, 129: 207, 130: 138}
+Validation domains (raw IDs): [120, 128]
+Validation domain counts: {120: 230, 128: 115}
+Test domains (raw IDs): [121, 126]
+Test domain counts: {121: 161, 126: 115}
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.801791
+Val MAE: 0.657343
+Val RMSE: 0.895428
+Val R2: 0.268326
+Val Avg R2 (per-dim): -0.361234
+Val Pearson: 0.136982
+Val Spearman: 0.155016
+
+--- Test Set Results (Best Model) ---
+Test MSE: 1.111914
+Test MAE: 0.766390
+Test RMSE: 1.054474
+Test R2: 0.214738
+Test Avg R2 (per-dim): -0.259513
+Test Pearson: -0.029003
+Test Spearman: -0.038487
+
+--- Per-Emotion Metrics ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         1.0636     0.8321    -0.3239    -0.1413    -0.0936
+alert            0.9515     0.6215    -0.6310    -0.1041    -0.1099
+determined       1.3349     0.9088    -0.3049    -0.1895    -0.1601
+attentive        1.4277     0.9816    -0.0699    -0.0492    -0.0325
+active           1.1834     0.9040    -0.1152    -0.0824    -0.0734
+hostile          0.5637     0.4730    -0.1050     0.0406     0.0674
+nervous          0.9424     0.7424    -0.1924    -0.0931    -0.0394
+upset            1.0396     0.8284    -0.0270     0.0122     0.0389
+afraid           0.8278     0.6153    -0.1857    -0.0757    -0.0822
+ashamed          0.5825     0.4314    -0.3992    -0.0461     0.0309
+fatigue          1.3518     0.9877    -0.5003    -0.0176    -0.0142
+----------------------------------------------------------------------
+Average          1.0244     0.7569    -0.2595    -0.0678    -0.0426

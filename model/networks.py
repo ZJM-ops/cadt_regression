@@ -2,7 +2,6 @@
 import sys
 import os
 
-# 将项目根目录添加到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
@@ -55,7 +54,9 @@ class CNNEncoder(nn.Module):
         self.fc21 = nn.Sequential(nn.Linear(128, t_size))
 
     def forward(self, z, with_argumentation=False, with_connection=True):
-        data = z.cuda()
+        # z: (B, seq_len, x_dim); move to the same device as model params
+        device = next(self.parameters()).device
+        data = z.to(device)
         data = data.transpose(1, 2)
         if with_argumentation:
             data = data_argumentation(data)
@@ -121,11 +122,9 @@ class MLPEncoder(nn.Module):
         )
 
     def forward(self, z, with_argumentation=False, with_connection=True):
-        # z: (B, seq_len, x_dim) on CPU/GPU; .cuda() call kept so training code unchanged
-        if not z.is_cuda:
-            x = z.cuda()
-        else:
-            x = z
+        # z: (B, seq_len, x_dim); move to the same device as model params
+        device = next(self.parameters()).device
+        x = z.to(device)
         if with_argumentation:
             # simple Gaussian noise as argumentation for vectors
             x = x + 0.05 * torch.randn_like(x)

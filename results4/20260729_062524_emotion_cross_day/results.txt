@@ -1,0 +1,52 @@
+=== CADT Training Results ===
+Timestamp: 20260729_062524
+Split Mode: cross_day
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: 15
+Target Domain IDs: [143, 149]
+Number of Source Domains: 6
+Best Epoch: 244
+
+--- Domain Information ---
+Training domains (raw IDs): [141, 144, 145, 147, 148, 150]
+Training domain counts: {141: 161, 144: 161, 145: 207, 147: 207, 148: 207, 150: 184}
+Validation domains (raw IDs): [143, 149]
+Validation domain counts: {143: 230, 149: 207}
+Test domains (raw IDs): [142, 146]
+Test domain counts: {142: 184, 146: 207}
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.339161
+Val MAE: 0.459067
+Val RMSE: 0.582375
+Val R2: -0.041102
+Val Avg R2 (per-dim): -0.333730
+Val Pearson: -0.003371
+Val Spearman: 0.017646
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.451797
+Test MAE: 0.503251
+Test RMSE: 0.672158
+Test R2: -0.067925
+Test Avg R2 (per-dim): -0.343330
+Test Pearson: -0.035960
+Test Spearman: -0.013271
+
+--- Per-Emotion Metrics ---Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         0.3836     0.4531    -0.1939     0.0265     0.0180
+alert            0.0974     0.1562    -0.0341     0.1541     0.1395
+determined       0.3867     0.5730    -0.6619    -0.1792    -0.1860
+attentive        0.7161     0.6955    -0.0682    -0.0372    -0.0095
+active           0.5240     0.6120    -0.6307     0.3108     0.3141
+hostile          0.1192     0.2495    -1.3899    -0.1298    -0.1633
+nervous          0.3503     0.5321    -0.0364    -0.1695    -0.1748
+upset            0.2252     0.4462     0.0320     0.1857     0.2887
+afraid           0.3541     0.5132    -0.0479    -0.0942    -0.0451
+ashamed          0.1500     0.2643    -0.4246    -0.2089    -0.1358
+fatigue          0.4243     0.5548    -0.2155     0.1048     0.1484
+----------------------------------------------------------------------
+Average          0.3392     0.4591    -0.3337    -0.0034     0.0176
+
+Model Saved: /root/zjm/cadt/results4/20260729_062524_emotion_cross_day/model_best.pth

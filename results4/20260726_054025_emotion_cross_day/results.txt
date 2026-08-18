@@ -1,0 +1,51 @@
+=== CADT Training Results ===
+Timestamp: 20260726_054025
+Split Mode: cross_day
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: 7
+Target Domain IDs: [66, 68]
+Number of Source Domains: 6
+Best Epoch: 228
+
+--- Domain Information ---
+Training domains (raw IDs): [61, 62, 63, 64, 65, 67]
+Training domain counts: {61: 161, 62: 230, 63: 184, 64: 207, 65: 230, 67: 207}
+Validation domains (raw IDs): [66, 68]
+Validation domain counts: {66: 207, 68: 230}
+Test domains (raw IDs): [60, 69]
+Test domain counts: {60: 230, 69: 207}
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.295785
+Val MAE: 0.309130
+Val RMSE: 0.543861
+Val R2: 0.159607
+Val Avg R2 (per-dim): -0.893157
+Val Pearson: 0.067858
+Val Spearman: 0.067488
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.234088
+Test MAE: 0.283531
+Test RMSE: 0.483826
+Test R2: 0.197395
+Test Avg R2 (per-dim): -0.694632
+Test Pearson: -0.056978
+Test Spearman: -0.059547
+
+--- Per-Emotion Metrics ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         1.3693     0.8789    -0.7044    -0.1041    -0.1103
+alert            0.7492     0.5966    -0.2844     0.0269    -0.0082
+determined       2.0209     1.0317    -0.9756     0.0703     0.0614
+attentive        2.2075     1.1744    -0.6543    -0.1948    -0.2440
+active           3.2775     1.5307    -2.0886     0.0615     0.0263
+hostile          0.5630     0.4620    -0.1037     0.1107     0.0788
+nervous          1.1834     0.7017    -0.4974    -0.0159     0.0318
+upset            1.7151     0.9259    -0.6942    -0.0130     0.0039
+afraid           0.8898     0.5817    -0.2746    -0.0759    -0.0343
+ashamed          0.5571     0.4060    -0.3381     0.1204     0.1721
+fatigue          1.8252     1.0534    -1.0258    -0.0012    -0.0184
+----------------------------------------------------------------------
+Average          1.4871     0.8494    -0.6946    -0.0014    -0.0037

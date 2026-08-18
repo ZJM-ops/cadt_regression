@@ -31,6 +31,8 @@ parser.add_argument("--sphere_loss_weight", type=float, default=10.0)
 parser.add_argument("--discriminator_loss_weight", type=float, default=1.0)
 parser.add_argument("--domain_cls_weight", type=float, default=1.0)
 parser.add_argument("--contrast_tau", type=float, default=1.0)
+parser.add_argument("--result_base", type=str, default=None,
+                    help="Override result directory name (e.g., results_mlp_search). If None, auto-determined.")
 parser.add_argument("--t_size", type=int, default=128,
                      help="embedding size (t_size) in encoder; results saved under result_base/tsize{xx}/")
 parser.add_argument("--data_dir", type=str, default="/vePFS-0x0d/DailyEEG/processed_cadt_addtime_new")
@@ -88,18 +90,21 @@ if __name__ == '__main__':
     timestamp = time.strftime("%Y%m%d_%H%M%S")
 
     # 结果文件夹路径
-    if args.norm_mode == "day":
-        result_base = "result_day_td"
-    elif args.norm_mode == "subject":
-        result_base = "result_sub_std"
+    if args.result_base is not None:
+        result_base = args.result_base
     else:
-        result_base = "results4"
-    if args.ablation != "none":
-        result_base = result_base + "_ablation"
-    result_base = os.path.join(result_base, f"tsize{args.t_size}")
-    if args.encoder_type == "mlp":
-        #result_base = result_base + "_enc_mlp"results_
-        result_base ="results_mlp"
+        if args.norm_mode == "day":
+            result_base = "result_day_td"
+        elif args.norm_mode == "subject":
+            result_base = "result_sub_std"
+        else:
+            result_base = "results4"
+        if args.ablation != "none":
+            result_base = result_base + "_ablation"
+        result_base = os.path.join(result_base, f"tsize{args.t_size}")
+        if args.encoder_type == "mlp":
+            #result_base = result_base + "_enc_mlp"results_
+            result_base = "results_mlp_ablation" if args.ablation != "none" else "results_mlp"
     result_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), result_base,
                               f"{timestamp}_emotion_{args.split_mode}")
     os.makedirs(result_dir, exist_ok=True)

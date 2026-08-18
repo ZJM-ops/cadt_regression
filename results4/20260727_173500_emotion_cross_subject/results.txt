@@ -1,0 +1,57 @@
+=== CADT Training Results ===
+Timestamp: 20260727_173500
+Split Mode: cross_subject
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: all subjects
+Target Domain IDs: [3, 5, 13]
+Number of Source Domains: 9
+Best Epoch: 282
+
+--- Domain Information ---
+Training domains (raw IDs): [1, 4, 6, 7, 8, 10, 11, 12, 15]
+Training domain counts: {1: 1794, 4: 1035, 6: 2346, 7: 2093, 8: 2024, 10: 2369, 11: 1794, 12: 2231, 15: 1955}
+Validation domains (raw IDs): [3, 5, 13]
+Validation domain counts: {3: 1633, 5: 1978, 13: 1495}
+Test domains (raw IDs): [2, 9, 14]
+Test domain counts: {2: 1886, 9: 1978, 14: 2208}
+
+--- Subject Information (cross_subject mode) ---
+Training subjects: [1, 4, 6, 7, 8, 10, 11, 12, 15] (total 9)
+Validation subjects: [3, 5, 13] (total 3)
+Test subjects: [2, 9, 14] (total 3)
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.981161
+Val MAE: 0.778000
+Val RMSE: 0.990536
+Val R2: 0.193159
+Val Avg R2 (per-dim): -0.054354
+Val Pearson: 0.051745
+Val Spearman: 0.052581
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.691931
+Test MAE: 0.683322
+Test RMSE: 0.831824
+Test R2: 0.117995
+Test Avg R2 (per-dim): -0.161479
+Test Pearson: 0.045865
+Test Spearman: 0.051273
+
+--- Per-Emotion Metrics ---Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         1.0112     0.8432     0.0045     0.1295     0.0766
+alert            0.8255     0.7560    -0.0005     0.1477     0.1760
+determined       1.3923     0.9336    -0.1488    -0.0054     0.0451
+attentive        1.4987     1.0147    -0.0153     0.0371     0.0063
+active           1.2686     0.9376    -0.1369     0.0686     0.0846
+hostile          0.7178     0.6169    -0.0520    -0.0649    -0.0644
+nervous          0.8296     0.7361    -0.0326     0.1319     0.1054
+upset            1.2394     0.8685    -0.0740    -0.0082    -0.0076
+afraid           0.5506     0.6354    -0.0145     0.1518     0.1483
+ashamed          0.5258     0.5222    -0.0419     0.0262     0.0033
+fatigue          0.9333     0.6938    -0.0859    -0.0450     0.0049
+----------------------------------------------------------------------
+Average          0.9812     0.7780    -0.0544     0.0517     0.0526
+
+Model Saved: /root/zjm/cadt/results4/20260727_173500_emotion_cross_subject/model_best.pth

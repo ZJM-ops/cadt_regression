@@ -1,0 +1,78 @@
+=== CADT Training Results ===
+Timestamp: 20260817_144843
+Split Mode: cross_subject
+Split Dir: /vePFS-0x0d/DailyEEG/splits_new
+Target Subject: all subjects
+Target Domain IDs: [3, 5, 13]
+Number of Source Domains: 9
+Best Epoch: 23
+Ablation: none
+Encoder: cnn
+t_size: 8
+
+--- Domain Information ---
+Training domains (raw IDs): [1, 4, 6, 7, 8, 10, 11, 12, 15]
+Training domain counts: {1: 1794, 4: 1035, 6: 2346, 7: 2093, 8: 2024, 10: 2369, 11: 1794, 12: 2231, 15: 1955}
+Validation domains (raw IDs): [3, 5, 13]
+Validation domain counts: {3: 1633, 5: 1978, 13: 1495}
+Test domains (raw IDs): [2, 9, 14]
+Test domain counts: {2: 1886, 9: 1978, 14: 2208}
+
+--- Subject Information (cross_subject) ---
+Training subjects: [1, 4, 6, 7, 8, 10, 11, 12, 15] (total 9)
+Validation subjects: [3, 5, 13] (total 3)
+Test subjects: [2, 9, 14] (total 3)
+
+--- Validation Set Results (Best Model) ---
+Val MSE: 0.992914
+Val MAE: 0.782409
+Val RMSE: 0.996450
+Val R2: 0.183495
+Val Avg R2 (per-dim): -0.065596
+Val Pearson: -0.038475
+Val Spearman: -0.049468
+
+--- Test Set Results (Best Model) ---
+Test MSE: 0.710566
+Test MAE: 0.687555
+Test RMSE: 0.842951
+Test R2: 0.094241
+Test Avg R2 (per-dim): -0.198460
+Test Pearson: -0.022745
+Test Spearman: -0.009575
+
+--- Per-Emotion Metrics (Test Set) ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         0.9088     0.7985    -0.5239    -0.0341     0.0076
+alert            0.5578     0.6740    -0.2462    -0.0154     0.0002
+determined       0.8443     0.7738    -0.7145    -0.0283    -0.0166
+attentive        1.2243     0.9078    -0.0936     0.0049    -0.0165
+active           0.9094     0.8191    -0.1050     0.0039     0.0200
+hostile          0.3128     0.3996    -0.0381    -0.0176     0.0670
+nervous          0.5694     0.6605    -0.1170    -0.0361    -0.1493
+upset            0.9733     0.8200    -0.0456    -0.0522     0.1025
+afraid           0.3501     0.5368    -0.2408    -0.0267    -0.0767
+ashamed          0.3605     0.4679    -0.0464    -0.0484    -0.1372
+fatigue          0.8055     0.7051    -0.0119    -0.0002     0.0938
+----------------------------------------------------------------------
+Average          0.7106     0.6876    -0.1985    -0.0227    -0.0096
+
+--- Per-Emotion Metrics (Validation Set) ---
+Emotion             MSE        MAE         R2    Pearson   Spearman
+----------------------------------------------------------------------
+inspired         1.0293     0.8200    -0.0134    -0.1752    -0.1309
+alert            0.8279     0.7556    -0.0034    -0.0485    -0.0246
+determined       1.3913     0.9339    -0.1480     0.0439     0.0679
+attentive        1.5234     1.0377    -0.0320    -0.0217    -0.1002
+active           1.2840     0.9433    -0.1508    -0.0670    -0.0463
+hostile          0.7413     0.5997    -0.0865    -0.0928    -0.1108
+nervous          0.8273     0.7384    -0.0297    -0.1020    -0.1276
+upset            1.2672     0.8822    -0.0981    -0.0591    -0.0418
+afraid           0.5516     0.6364    -0.0164    -0.0171    -0.0202
+ashamed          0.5170     0.5357    -0.0245     0.0101    -0.0792
+fatigue          0.9616     0.7236    -0.1189     0.1062     0.0695
+----------------------------------------------------------------------
+Average          0.9929     0.7824    -0.0656    -0.0385    -0.0495
+
+Model Saved: /root/zjm/cadt/results_cnn_search/20260817_144843_emotion_cross_subject/model_best.pth
