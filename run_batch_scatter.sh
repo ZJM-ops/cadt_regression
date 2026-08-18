@@ -4,6 +4,9 @@
 # 批量为 results4 下带 emotion 的实验生成散点图
 # ============================================================
 
+mkdir -p /root/zjm/cadt_test_code/tmp
+export TMPDIR=/root/zjm/cadt_test_code/tmp
+
 RESULTS_DIR="/root/zjm/cadt/results4"
 DATA_DIR="/vePFS-0x0d/DailyEEG/processed_cadt_addtime_new"
 PLOT_SCRIPT="/root/zjm/cadt/plot_scatter.py"

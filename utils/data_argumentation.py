@@ -3,11 +3,12 @@ import torch
 
 
 def segment_exchange(input_x, series_length=10, sub_seq_length=1):
+    sub_seq_length = min(sub_seq_length, max(1, (series_length - 1) // 2))
+    if series_length < 4:
+        return input_x
     t = [i for i in range(series_length)]
-    i = random.randint(0, series_length - 1 - 2 * sub_seq_length - 1)
-    j = random.randint(sub_seq_length + 1, series_length - 1 - sub_seq_length)
-    while j - i <= sub_seq_length:
-        j = random.randint(sub_seq_length + 1, series_length - 1 - sub_seq_length)
+    i = random.randint(0, series_length - 2 * sub_seq_length - 1)
+    j = random.randint(i + sub_seq_length + 1, series_length - sub_seq_length)
     for v in range(sub_seq_length):
         t[i + v] = j + v
         t[j + v] = i + v
@@ -17,8 +18,11 @@ def segment_exchange(input_x, series_length=10, sub_seq_length=1):
 
 
 def segment_remove(input_x, series_length=10, sub_seq_length=1):
+    sub_seq_length = min(sub_seq_length, max(1, (series_length - 1) // 2))
+    if series_length < 2:
+        return input_x
     t = [True for _ in range(series_length)]
-    i = random.randint(0, series_length - 1 - sub_seq_length - 1)
+    i = random.randint(0, series_length - sub_seq_length)
     for v in range(sub_seq_length):
         t[i + v] = False
     b = torch.masked_select(input_x, torch.tensor(t, device='cuda')).cuda()
@@ -29,10 +33,14 @@ def segment_remove(input_x, series_length=10, sub_seq_length=1):
 
 
 def segment_shuffle(input_x, series_length=10, sub_seq_length=2):
+    sub_seq_length = max(2, min(sub_seq_length, series_length))
+    if series_length < 2:
+        return input_x
     t = [i for i in range(series_length)]
-    i = random.randint(0, series_length - 1 - sub_seq_length - 1)
-    for v in range(int(sub_seq_length * 0.5)):
-        t[i + v] = t[i + sub_seq_length - 1 - v]
+    i = random.randint(0, series_length - sub_seq_length)
+    sub = t[i:i+sub_seq_length]
+    sub.reverse()
+    t[i:i+sub_seq_length] = sub
     idx = torch.LongTensor(t).cuda()
     r = input_x.index_select(dim=1, index=idx)
     return r

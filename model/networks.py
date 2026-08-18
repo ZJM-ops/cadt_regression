@@ -1,8 +1,13 @@
 # networks.py
 import sys
+import os
+
+# 将项目根目录添加到 Python 路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.nn as nn
-from zjm.cadt.utils.data_argumentation import data_argumentation
+from utils.data_argumentation import data_argumentation
 
 
 class CNNEncoder(nn.Module):
@@ -75,6 +80,60 @@ class CNNEncoder(nn.Module):
         data2 = data2.flatten(1, 2)
         f2 = self.fc21(data2)
 
+        return f1, f2
+
+
+class MLPEncoder(nn.Module):
+    """Simple MLP encoder for vectorized DE features (or any flattened input).
+
+    Input:  (B, seq_len, x_dim)  - for DE: seq_len=1, x_dim=n_channels*n_bands (e.g. 295)
+            Internally we first flatten to (B, seq_len*x_dim) so any seq_len works.
+    Output: f1 (zsc, domain-invariant), f2 (zs, domain-specific) each of shape (B, t_size).
+            Same signature as CNNEncoder so it can be swapped in by encoder_type flag.
+    """
+    def __init__(self, t_size, x_dim=295, seq_len=1, hidden=512):
+        super().__init__()
+        self.seq_len = seq_len
+        self.x_dim = x_dim
+        in_dim = x_dim * seq_len
+
+        def _mlp_block(in_, out_, drop=0.2):
+            return nn.Sequential(
+                nn.Linear(in_, out_),
+                nn.BatchNorm1d(out_),
+                nn.ReLU(),
+                nn.Dropout(drop),
+            )
+
+        # shared trunk
+        self.trunk = nn.Sequential(
+            _mlp_block(in_dim, hidden),
+            _mlp_block(hidden, hidden),
+        )
+        # two heads for zsc (domain-invariant / task) and zs (domain-specific)
+        self.head_zsc = nn.Sequential(
+            _mlp_block(hidden, 256),
+            nn.Linear(256, t_size),
+        )
+        self.head_zs = nn.Sequential(
+            _mlp_block(hidden, 256),
+            nn.Linear(256, t_size),
+        )
+
+    def forward(self, z, with_argumentation=False, with_connection=True):
+        # z: (B, seq_len, x_dim) on CPU/GPU; .cuda() call kept so training code unchanged
+        if not z.is_cuda:
+            x = z.cuda()
+        else:
+            x = z
+        if with_argumentation:
+            # simple Gaussian noise as argumentation for vectors
+            x = x + 0.05 * torch.randn_like(x)
+        flat = x.flatten(1)              # (B, seq_len*x_dim)
+        h = self.trunk(flat)            # (B, hidden)
+        f1 = self.head_zsc(h)           # (B, t_size) zsc
+        f2 = self.head_zs(h)            # (B, t_size) zs
+        # with_connection param is for CNN branch cross-fusion; MLP has no such connection
         return f1, f2
 
 
