@@ -41,33 +41,82 @@ def load_model(model_path, args):
     else:
         state_dict = checkpoint
 
-    # 自动检测 t_size (embedding size)：share_encoder.fc11.0.weight 形状为 [t_size, 128]
-    # 训练时 t_size 可通过 --t_size 指定（结果存于 tsize{xx}/ 子目录），
-    # 若不显式设置则使用模型默认值 8，会与训练时不一致而导致 size mismatch。
+    # --- 检测 encoder_type ---
+    has_mlp = any(k.startswith('share_encoder.trunk') or
+                  k.startswith('share_encoder.head_zsc') for k in state_dict)
+    has_cnn = any(k.startswith('share_encoder.feature_') or
+                  k.startswith('share_encoder.conv') or
+                  k.startswith('share_encoder.fc11') for k in state_dict)
+    if has_mlp and not has_cnn:
+        encoder_type = 'mlp'
+    elif has_cnn and not has_mlp:
+        encoder_type = 'cnn'
+    else:
+        encoder_type = getattr(args, 'encoder_type', 'cnn')
+    args.encoder_type = encoder_type
+    print(f"  encoder_type = {encoder_type}")
+
+    # --- 检测 t_size 和 x_dim / seq_len ---
     t_size_detected = None
-    for key in state_dict.keys():
-        if key == 'share_encoder.fc11.0.weight':
-            t_size_detected = state_dict[key].shape[0]
-            break
+    x_dim_detected = None
+    seq_len_detected = None
+
+    if encoder_type == 'mlp':
+        # MLP: t_size 从 head_zsc 最后一层 Linear 推断
+        for key in state_dict:
+            if key == 'share_encoder.head_zsc.3.weight':
+                t_size_detected = state_dict[key].shape[0]
+                break
+        # x_dim * seq_len 从 trunk.0.weight 推断
+        for key in state_dict:
+            if key == 'share_encoder.trunk.0.weight':
+                in_dim = state_dict[key].shape[1]
+                x_dim_detected = in_dim  # 默认 seq_len=1
+                seq_len_detected = 1
+                break
+    else:  # cnn
+        for key in state_dict:
+            if key == 'share_encoder.fc11.0.weight':
+                t_size_detected = state_dict[key].shape[0]
+                break
+        x_dim_detected = 59
+        seq_len_detected = 2000
+
+    # t_size 处理
     if getattr(args, 't_size', None) is not None:
-        # 命令行显式指定优先
         t_size = args.t_size
-        if t_size_detected is not None and t_size != t_size_detected:
-            print(f"  警告: 命令行 t_size={t_size} 与 checkpoint 检测值 {t_size_detected} 不一致，使用命令行值")
     elif t_size_detected is not None:
         t_size = t_size_detected
     else:
-        t_size = 8  # 与 CATDModel 默认一致
+        t_size = 8
     args.t_size = t_size
-    print(f"  t_size = {args.t_size}")
 
+    # x_dim / seq_len 处理
+    if getattr(args, 'x_dim', None) is not None:
+        args.x_dim = args.x_dim
+    elif x_dim_detected is not None:
+        args.x_dim = x_dim_detected
+    else:
+        args.x_dim = 59
+
+    if getattr(args, 'seq_len', None) is not None:
+        args.seq_len = args.seq_len
+    elif seq_len_detected is not None:
+        args.seq_len = seq_len_detected
+    else:
+        args.seq_len = 2000
+
+    print(f"  t_size = {args.t_size}, x_dim = {args.x_dim}, seq_len = {args.seq_len}")
+
+    # --- 检测 n_sources ---
     n_sources = 1
     for key in state_dict.keys():
         if 'discriminator.model.4.weight' in key:
             n_sources = state_dict[key].shape[0]
             break
-
     args.n_sources = n_sources
+
+    # --- 创建模型 ---
     model = CATDModel(args).cuda()
 
     model_state_dict = model.state_dict()
@@ -378,14 +427,17 @@ def main():
     parser.add_argument('--device', type=int, default=0, help='GPU 编号')
     parser.add_argument('--t_size', type=int, default=None,
                         help='embedding size (t_size)，默认从 checkpoint 自动检测；显式指定时优先')
+    parser.add_argument('--encoder_type', type=str, default=None, choices=['cnn', 'mlp'],
+                        help='编码器类型，默认从 checkpoint 自动检测')
+    parser.add_argument('--x_dim', type=int, default=None, help='输入维度，默认从 checkpoint 自动检测')
+    parser.add_argument('--seq_len', type=int, default=None, help='序列长度，默认从 checkpoint 自动检测')
     parser.add_argument('--output_dir', type=str, default=None, help='输出目录 (默认为模型同目录下的 timeseries_plots)')
     
     args = parser.parse_args()
     
     torch.cuda.set_device(args.device)
     
-    args.x_dim = 59
-    args.seq_len = 2000
+    # 设置默认值（可能会被 load_model 中的自动检测覆盖）
     args.d_AE = 128
     args.n_targets = 11
     
@@ -395,6 +447,14 @@ def main():
     split_dir = args.split_dir or train_params.get('split_dir', '/vePFS-0x0d/DailyEEG/splits_new')
     data_dir = args.data_dir or train_params.get('data_dir', '/vePFS-0x0d/DailyEEG/processed_cadt_addtime_new')
     norm_mode = train_params.get('norm_mode', 'sample')
+    
+    # 从 params.txt 读取 encoder_type 和相关参数（如果用户没有在命令行指定）
+    if args.encoder_type is None and 'encoder_type' in train_params:
+        args.encoder_type = train_params['encoder_type']
+    if args.x_dim is None and 'x_dim' in train_params:
+        args.x_dim = int(train_params['x_dim'])
+    if args.seq_len is None and 'seq_len' in train_params:
+        args.seq_len = int(train_params['seq_len'])
     
     print(f"训练参数: split_mode={split_mode}, split_dir={split_dir}")
     print(f"  data_dir={data_dir}, norm_mode={norm_mode}")
