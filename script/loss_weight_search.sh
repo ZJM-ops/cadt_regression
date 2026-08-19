@@ -65,6 +65,42 @@ source /root/miniconda3/etc/profile.d/conda.sh
 conda activate "${CONDA_ENV}"
 cd "${CADT_ROOT}"
 
+# 检查某个参数组合是否已成功跑过（在 ${RESULT_BASE}/ 下存在匹配 params.txt 且含 results.txt 的目录）
+# 用法: already_done <sphere> <disc> <dom> <tau>
+# 返回 0=已完成（跳过），1=未完成（需跑）
+already_done() {
+    local result
+    result=$(python3 - "$1" "$2" "$3" "$4" "$SPLIT_MODE" "$RESULT_BASE" <<'PYEOF'
+import sys, os, re
+sphere, disc, dom, tau, split_mode, base = sys.argv[1:7]
+def norm(x):
+    try: return f"{float(x):g}"
+    except: return x
+target = {
+    "sphere_loss_weight": norm(sphere),
+    "discriminator_loss_weight": norm(disc),
+    "domain_cls_weight": norm(dom),
+    "contrast_tau": norm(tau),
+    "split_mode": split_mode,
+}
+if not os.path.isdir(base):
+    print("no"); sys.exit()
+for d in os.listdir(base):
+    p = os.path.join(base, d, "params.txt")
+    if not os.path.isfile(p): continue
+    pm = {}
+    for line in open(p):
+        m = re.match(r"\s*(\w+):\s*(\S+)", line)
+        if m: pm[m.group(1)] = norm(m.group(2))
+    if all(pm.get(k) == v for k, v in target.items()) and \
+       os.path.isfile(os.path.join(base, d, "results.txt")):
+        print("yes"); sys.exit()
+print("no")
+PYEOF
+)
+    [ "${result}" = "yes" ]
+}
+
 run_single() {
     local sphere_w="$1"
     local disc_w="$2"
@@ -74,6 +110,12 @@ run_single() {
 
     echo ""
     echo ">>> [${label}] sphere=${sphere_w} disc=${disc_w} dom=${dom_w} tau=${tau}"
+
+    # 跳过已成功跑过的参数组合（results.txt 存在）
+    if already_done "${sphere_w}" "${disc_w}" "${dom_w}" "${tau}"; then
+        echo ">>> [${label}] 已跑过（results.txt 存在），跳过"
+        return 0
+    fi
 
     local args=(
         --x_dim "${X_DIM}"
