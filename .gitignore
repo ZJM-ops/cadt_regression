@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp / scratch
+tmp/
+
+# OS / IDE
+.DS_Store
+.idea/
