@@ -146,7 +146,7 @@ def fmt_mean_sd(values):
     if len(values) == 0:
         return "N/A"
     m = np.mean(values)
-    s = np.std(values, ddof=0)
+    s = np.std(values, ddof=1) if len(values) > 1 else 0.0
     return f"{m:.4f}±{s:.4f}"
 
 
@@ -237,7 +237,60 @@ for var_key in WEIGHT_KEYS:
     else:
         print("  (no single-variable runs found)")
 
-# ---- 4. 保存 CSV ----
-output_csv = "/root/zjm/cadt_test_code/loss_weight_search_results.csv"
+# ---- 4. 保存 CSV（字符串版：mean±sd）----
+output_csv = "/root/zjm/cadt_test_code/report/07.loss_weight_search_results.csv"
 df.to_csv(output_csv, index=False)
 print(f"\nSaved: {output_csv}")
+
+# ---- 5. 保存数值版 CSV（每行一个实验，权重/指标都是数字，供 Jupyter 绘图）----
+# 直接从 runs 派生，按 (4 权重 + split_mode) 分组，保留 split_mode 列
+DEFAULTS = {"sphere_loss_weight": 10.0, "discriminator_loss_weight": 1.0,
+            "domain_cls_weight": 1.0, "contrast_tau": 1.0}
+
+def _classify_sweep(weights):
+    """识别单变量 sweep：其余 3 个=默认值时返回变化的那个 key，全默认返回 baseline"""
+    all_default = all(
+        weights.get(k) is not None and abs(weights[k] - DEFAULTS[k]) < 1e-9
+        for k in DEFAULTS
+    )
+    if all_default:
+        return "baseline"
+    for var_key in DEFAULTS:
+        others_default = all(
+            weights.get(k) is not None and abs(weights[k] - DEFAULTS[k]) < 1e-9
+            for k in DEFAULTS if k != var_key
+        )
+        if others_default:
+            return var_key
+    return "stage2_or_other"
+
+# 按 (4 权重 + split_mode) 分组
+groups_with_split = {}
+for r in runs:
+    key = tuple(r["weights"].get(wk) for wk in WEIGHT_KEYS) + (r["split_mode"],)
+    groups_with_split.setdefault(key, []).append(r)
+
+numeric_rows = []
+for key, group_runs in groups_with_split.items():
+    weights = group_runs[0]["weights"]
+    rec = {
+        "sphere_loss_weight": weights.get("sphere_loss_weight"),
+        "discriminator_loss_weight": weights.get("discriminator_loss_weight"),
+        "domain_cls_weight": weights.get("domain_cls_weight"),
+        "contrast_tau": weights.get("contrast_tau"),
+        "split_mode": group_runs[0]["split_mode"],
+        "n_seeds": len(group_runs),
+    }
+    for mk in METRIC_KEYS:
+        vals = [r["metrics"][mk] for r in group_runs if mk in r["metrics"]]
+        rec[f"{mk}_mean"] = float(np.mean(vals)) if vals else None
+    rec["sweep_type"] = _classify_sweep(weights)
+    numeric_rows.append(rec)
+
+df_numeric = pd.DataFrame(numeric_rows)
+
+output_csv_numeric = "/root/zjm/cadt_test_code/report/07.loss_weight_search_results_numeric.csv"
+df_numeric.to_csv(output_csv_numeric, index=False)
+print(f"Saved (numeric, for plotting): {output_csv_numeric}")
+print("sweep_type × split_mode distribution:")
+print(pd.crosstab(df_numeric["sweep_type"], df_numeric["split_mode"]).to_string())

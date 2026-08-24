@@ -6,14 +6,17 @@
     python md2pdf.py input.md
     python md2pdf.py input.md -o output.pdf
     python md2pdf.py input.md --css custom.css
+    python md2pdf.py input.md --backend playwright   # 默认, 支持 LaTeX 公式
+    python md2pdf.py input.md --backend weasyprint    # 无浏览器离线兜底, 不渲染公式
 
 依赖:
-    pip install markdown weasyprint
+    playwright(默认): pip install markdown pymdown-extensions playwright && playwright install chromium
+    weasyprint(可选):  pip install weasyprint
 
 特性:
     - 支持中文 (内置中文字体配置)
+    - 支持 LaTeX 数学公式 ($...$, $$...$$), 经 MathJax 渲染 (playwright 后端)
     - 自动将本地图片转为 base64 嵌入 (无需网络)
-    - 支持相对路径图片
     - 支持 GitHub Flavored Markdown (表格、代码块等)
     - 可选自定义 CSS 样式
 """
@@ -24,6 +27,25 @@ import os
 import re
 import sys
 import markdown
+
+
+# MathJax v3 配置: 配合 pymdownx.arithmatex (generic=True) 输出的 \(...\) / \[...\]
+# pageReady 在初始排版完成后置 mathJaxReady=true, 供 playwright 轮询等待
+MATHJAX_HEAD = r"""<script>
+window.MathJax = {
+  tex: {
+    inlineMath: [['\\(', '\\)']],
+    displayMath: [['\\[', '\\]']],
+    processEscapes: true
+  },
+  startup: {
+    pageReady: () => MathJax.startup.defaultPageReady().then(() => { window.mathJaxReady = true; })
+  }
+};
+</script>
+<script id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+"""
 
 
 def image_to_base64(image_path):
@@ -79,6 +101,8 @@ body {
     line-height: 1.6;
     color: #333;
     max-width: 100%;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 }
 
 h1 {
@@ -196,7 +220,30 @@ li {
 """
 
 
-def md_to_pdf(md_path, pdf_path=None, css_path=None):
+def render_pdf_playwright(full_html, pdf_path):
+    """用 playwright + MathJax 渲染 HTML 为 PDF (支持 LaTeX 公式)"""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        # root 环境需 --no-sandbox; --disable-dev-shm-usage 避免 /dev/shm 太小
+        browser = p.chromium.launch(args=['--no-sandbox', '--disable-dev-shm-usage'])
+        page = browser.new_page()
+        page.set_content(full_html, wait_until='networkidle', timeout=120000)
+        # 等待 MathJax 初始排版完成 (pageReady 置 mathJaxReady=true)
+        try:
+            page.wait_for_function("() => window.mathJaxReady === true", timeout=60000)
+        except Exception as e:
+            print(f"  警告: MathJax 渲染等待超时, 公式可能未渲染: {e}", file=sys.stderr)
+        page.pdf(
+            path=pdf_path,
+            format='A4',
+            margin={'top': '2cm', 'bottom': '2cm', 'left': '1.5cm', 'right': '1.5cm'},
+            print_background=True,
+        )
+        browser.close()
+
+
+def md_to_pdf(md_path, pdf_path=None, css_path=None, backend='playwright'):
     """将 Markdown 文件转换为 PDF"""
     if pdf_path is None:
         pdf_path = os.path.splitext(md_path)[0] + '.pdf'
@@ -207,11 +254,19 @@ def md_to_pdf(md_path, pdf_path=None, css_path=None):
     with open(md_path, 'r', encoding='utf-8') as f:
         md_text = f.read()
 
-    # 转换为 HTML
+    # 转换为 HTML: playwright 后端启用 arithmatex 保护 $...$/$$...$$ 公式
+    extensions = ['tables', 'fenced_code', 'codehilite',
+                  'toc', 'smarty', 'sane_lists']
+    extension_configs = {}
+    use_math = (backend == 'playwright')
+    if use_math:
+        extensions.append('pymdownx.arithmatex')
+        extension_configs['pymdownx.arithmatex'] = {'generic': True}
+
     html_body = markdown.markdown(
         md_text,
-        extensions=['tables', 'fenced_code', 'codehilite',
-                     'toc', 'smarty', 'sane_lists']
+        extensions=extensions,
+        extension_configs=extension_configs,
     )
 
     # 嵌入图片
@@ -224,12 +279,15 @@ def md_to_pdf(md_path, pdf_path=None, css_path=None):
     else:
         css_content = generate_css()
 
+    head_extra = MATHJAX_HEAD if use_math else ''
+
     # 组装完整 HTML
     full_html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 {css_content}
+{head_extra}
 </head>
 <body>
 {html_body}
@@ -237,8 +295,11 @@ def md_to_pdf(md_path, pdf_path=None, css_path=None):
 </html>"""
 
     # 生成 PDF
-    from weasyprint import HTML
-    HTML(string=full_html, base_url=md_dir).write_pdf(pdf_path)
+    if backend == 'playwright':
+        render_pdf_playwright(full_html, pdf_path)
+    else:
+        from weasyprint import HTML
+        HTML(string=full_html, base_url=md_dir).write_pdf(pdf_path)
 
     file_size = os.path.getsize(pdf_path) / 1024
     print(f"PDF 已生成: {pdf_path} ({file_size:.1f} KB)")
@@ -254,18 +315,21 @@ def main():
   python md2pdf.py report.md
   python md2pdf.py report.md -o output.pdf
   python md2pdf.py report.md --css custom.css
+  python md2pdf.py report.md --backend weasyprint   # 无浏览器离线兜底, 不渲染公式
         """
     )
     parser.add_argument('input', help='输入 Markdown 文件路径')
     parser.add_argument('-o', '--output', default=None, help='输出 PDF 路径 (默认同名 .pdf)')
     parser.add_argument('--css', default=None, help='自定义 CSS 样式文件路径')
+    parser.add_argument('--backend', default='playwright', choices=['playwright', 'weasyprint'],
+                        help='渲染后端: playwright(默认,支持公式) / weasyprint(离线兜底,不渲染公式)')
     args = parser.parse_args()
 
     if not os.path.exists(args.input):
         print(f"错误: 文件不存在: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    md_to_pdf(args.input, args.output, args.css)
+    md_to_pdf(args.input, args.output, args.css, args.backend)
 
 
 if __name__ == '__main__':
