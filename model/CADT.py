@@ -127,11 +127,13 @@ class CATDModel(nn.Module):
         if ablation != "variant":
             self.domain_classifier_optimizer.step()
 
-        if ablation != "variant":
+        if ablation not in ("variant", "no_detach"):
             # --- Discriminator's own update: real objective, detached features ---
             # Mirrors the original's second .backward() pass, which trained
             # self.discriminator on the true source/target labels using detached
             # features (so this update doesn't also push the encoder).
+            # ablation="no_detach" 跳过此分支，只消融判别器自身更新路径，
+            # 其余 loss（reg + contrast + confusion + domain_class）保持不变。
             disc_logits2 = self.discriminator(zsc.detach())
             disc_loss = self.ce_loss(disc_logits2, dom_ids)
             self.discriminator_optimizer.zero_grad()

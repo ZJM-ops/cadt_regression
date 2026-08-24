@@ -49,9 +49,11 @@ parser.add_argument("--norm_mode", type=str, default="sample",
                      help="Normalization mode: sample (per-sample), day (per-day), subject (per-subject). "
                           "For DE features, prefer 'sample' (already day-normed in extraction).")
 parser.add_argument("--ablation", type=str, default="none",
-                     choices=["none", "variant"],
+                     choices=["none", "variant", "no_detach"],
                      help="Ablation mode: 'none' for full model; 'variant' keeps only regression + "
-                          "contrastive loss, removing all domain-related losses.")
+                          "contrastive loss, removing all domain-related losses; 'no_detach' only "
+                          "skips the discriminator's own detached-feature update (L_disc path at "
+                          "CADT.py:130-143), keeping confusion_loss + domain_class_loss intact.")
 parser.add_argument("--encoder_type", type=str, default="cnn",
                      choices=["cnn", "mlp"],
                      help="Encoder type: 'cnn' uses CNNEncoder (raw EEG waveform), "
@@ -437,6 +439,8 @@ if __name__ == '__main__':
         f.write(f"ablation: {args.ablation}\n")
         if args.ablation == "variant":
             f.write(f"  (regression + contrastive only; confusion_loss, domain_class_loss, disc_loss removed)\n")
+        elif args.ablation == "no_detach":
+            f.write(f"  (only discriminator's own detached update removed; confusion_loss + domain_class_loss kept)\n")
         f.write(f"\n--- Encoder ---\n")
         f.write(f"encoder_type: {args.encoder_type}\n")
         f.write(f"t_size: {args.t_size}\n")

@@ -10,7 +10,7 @@
 #   bash /root/zjm/cadt/script/loss_weight_search.sh all      # 两阶段都跑
 
 # ==================== 基础配置 ====================
-SPLIT_MODE="cross_day"
+SPLIT_MODE="cross_subject"  # within_subject_day | cross_subject | cross_day
 SPLIT_DIR="/vePFS-0x0d/DailyEEG/splits_new"
 TARGET_SUBJECT_EMOTION=""
 
@@ -37,11 +37,16 @@ DEFAULT_DOM=1.0
 DEFAULT_TAU=1.0
 
 # ==================== 搜索空间 ====================
-# Stage 1: 每个权重的候选值
-SPHERE_CANDIDATES="1.0 5.0 10.0 20.0 50.0"
-DISC_CANDIDATES="0.1 0.5 1.0 2.0 5.0"
-DOM_CANDIDATES="0.1 0.5 1.0 2.0 5.0"
-TAU_CANDIDATES="0.5 1.0 2.0 5.0"
+# Stage 1: 每个权重的候选值（不含各自默认值，baseline 单独跑一次，避免重复）
+SPHERE_CANDIDATES="0.0 1.0 5.0 20.0 50.0"      # 默认 10.0 由 baseline 统一跑
+DISC_CANDIDATES="0.0 0.1 0.5 2.0 5.0"          # 默认 1.0  由 baseline 统一跑
+DOM_CANDIDATES="0.0 0.1 0.5 2.0 5.0"           # 默认 1.0  由 baseline 统一跑
+TAU_CANDIDATES="0.5 2.0 5.0"               # 默认 1.0  由 baseline 统一跑
+
+# SPHERE_CANDIDATES="0"      # 默认 10.0 由 baseline 统一跑
+# DISC_CANDIDATES="0"          # 默认 1.0  由 baseline 统一跑
+# DOM_CANDIDATES="0"           # 默认 1.0  由 baseline 统一跑
+# TAU_CANDIDATES="1"               # 默认 1.0  由 baseline 统一跑
 
 # Stage 2: 组合搜索（手动填入 Stage 1 最优值附近的小网格）
 # 下面这些值在 Stage 1 跑完后手动调整
@@ -153,6 +158,11 @@ run_stage1() {
     echo "========================================"
 
     local count=0
+
+    # baseline（4 个权重全为默认值，单独跑一次，避免各 sweep 重复）
+    count=$((count + 1))
+    run_single "${DEFAULT_SPHERE}" "${DEFAULT_DISC}" "${DEFAULT_DOM}" "${DEFAULT_TAU}" \
+        "s1_baseline"
 
     # sphere_loss_weight
     for w in ${SPHERE_CANDIDATES}; do
