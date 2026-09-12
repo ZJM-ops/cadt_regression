@@ -1,21 +1,38 @@
 """
 Loss 权重搜索结果对比脚本
-扫描 result_day_td / result_day_td_ablation / results_mlp / results_mlp_ablation 目录，
-从 params.txt 提取 4 个 loss 权重参数，从 results.txt 提取 Test 指标，
-按权重组装分组，展示 mean±sd（多 seed）和单次结果。
+扫描 results_cnn_search / result_day_td 目录，从 params.txt 提取 4 个 loss 权重参数，
+从 results.txt 提取 Test 指标，按权重组组装分组，展示 mean±sd（多 seed）和单次结果。
+
+说明：
+- results_cnn_search: 主 sweep 结果，所有权重组合都接受
+- result_day_td: 历史结果，只接受 baseline 权重 (sphere=10, disc=1, dom=1, tau=1)
+  且必须 t_size=8（用模型 fc11 层 shape 验证，跳过 tsize32/tsize128 子目录）
+  作为 baseline 的额外 seed 复用，无需重新训练
 """
 
 import os
 import re
-import glob
 import numpy as np
 import pandas as pd
 
 # ======================== 配置 ========================
-# 要扫描的结果目录（根据 encoder_type 和 ablation 选择）
+# 要扫描的结果目录，每项格式: (目录路径, 是否只接受 baseline 权重)
+# result_day_td 只接受 baseline 权重作为额外 seed 复用，无需重新训练
 SEARCH_DIRS = [
-    "/root/zjm/cadt/results_cnn_search",  # CNN 权重搜索结果
+    ("/vePFS-0x0d/home/zjm/cadt_regression/results_cnn_search", False),
+    ("/vePFS-0x0d/home/zjm/cadt_regression/result_day_td",      True),
 ]
+
+# result_day_td 中跳过这些子目录（t_size 与 sweep 不一致，已通过模型 shape 验证）
+SKIP_SUBDIRS_RESULT_DAY_TD = {"tsize32", "tsize128"}
+
+# baseline 权重定义
+BASELINE_WEIGHTS = {
+    "sphere_loss_weight": 10.0,
+    "discriminator_loss_weight": 1.0,
+    "domain_cls_weight": 1.0,
+    "contrast_tau": 1.0,
+}
 
 # 要过滤的 split_mode（None=所有）
 FILTER_SPLIT_MODE = None  # "cross_day" or "cross_subject" or "within_subject_day" or None
@@ -67,17 +84,45 @@ def parse_results(filepath):
     return metrics
 
 
+def _iter_exp_dirs(base_dir):
+    """枚举一个结果根目录下的所有实验目录。
+    支持两种布局：
+    - 顶层直接是实验目录: {base_dir}/{exp_dir}/params.txt
+    - 一层中间子目录: {base_dir}/{sub}/{exp_dir}/params.txt（如 result_day_td/tsize8/...）
+    """
+    for entry in sorted(os.listdir(base_dir)):
+        full = os.path.join(base_dir, entry)
+        if not os.path.isdir(full):
+            continue
+        # 直接是实验目录
+        if os.path.isfile(os.path.join(full, "params.txt")):
+            yield entry, full
+            continue
+        # 一层中间子目录（如 tsize8/）
+        for sub_entry in sorted(os.listdir(full)):
+            sub_full = os.path.join(full, sub_entry)
+            if os.path.isdir(sub_full) and os.path.isfile(os.path.join(sub_full, "params.txt")):
+                yield f"{entry}/{sub_entry}", sub_full
+
+
 def collect_runs():
     """收集所有实验运行"""
     runs = []
-    for base_dir in SEARCH_DIRS:
+    for entry in SEARCH_DIRS:
+        # 兼容旧格式（纯字符串）和新格式（元组）
+        if isinstance(entry, tuple):
+            base_dir, baseline_only = entry
+        else:
+            base_dir, baseline_only = entry, False
+
         if not os.path.isdir(base_dir):
             print(f"[skip] {base_dir} not found")
             continue
 
-        for exp_dir in sorted(os.listdir(base_dir)):
-            full_path = os.path.join(base_dir, exp_dir)
-            if not os.path.isdir(full_path):
+        for exp_dir, full_path in _iter_exp_dirs(base_dir):
+            # 对 result_day_td 跳过 tsize32/tsize128 子目录（t_size 不匹配）
+            top_dir = exp_dir.split("/", 1)[0]
+            if base_dir.endswith("result_day_td") and top_dir in SKIP_SUBDIRS_RESULT_DAY_TD:
                 continue
 
             params_file = os.path.join(full_path, "params.txt")
@@ -93,20 +138,29 @@ def collect_runs():
 
             # 确保有权重信息
             weights = {}
-            has_weights = False
+            has_weights = True
             for wk in WEIGHT_KEYS:
                 val = params.get(wk)
-                if val is not None:
-                    try:
-                        weights[wk] = float(val)
-                        has_weights = True
-                    except ValueError:
-                        weights[wk] = None
-                else:
-                    weights[wk] = None
+                if val is None:
+                    has_weights = False
+                    break
+                try:
+                    weights[wk] = float(val)
+                except ValueError:
+                    has_weights = False
+                    break
 
             if not has_weights:
                 continue
+
+            # baseline_only 模式：只接受 baseline 权重组合
+            if baseline_only:
+                is_baseline = all(
+                    abs(weights[wk] - BASELINE_WEIGHTS[wk]) < 1e-9
+                    for wk in WEIGHT_KEYS
+                )
+                if not is_baseline:
+                    continue
 
             if not metrics:
                 continue
@@ -238,7 +292,7 @@ for var_key in WEIGHT_KEYS:
         print("  (no single-variable runs found)")
 
 # ---- 4. 保存 CSV（字符串版：mean±sd）----
-output_csv = "/root/zjm/cadt_test_code/report/07.loss_weight_search_results.csv"
+output_csv = "/vePFS-0x0d/home/zjm/cadt_regression/report/07.loss_weight_search_results.csv"
 df.to_csv(output_csv, index=False)
 print(f"\nSaved: {output_csv}")
 
@@ -289,7 +343,7 @@ for key, group_runs in groups_with_split.items():
 
 df_numeric = pd.DataFrame(numeric_rows)
 
-output_csv_numeric = "/root/zjm/cadt_test_code/report/07.loss_weight_search_results_numeric.csv"
+output_csv_numeric = "/vePFS-0x0d/home/zjm/cadt_regression/report/07.loss_weight_search_results_numeric.csv"
 df_numeric.to_csv(output_csv_numeric, index=False)
 print(f"Saved (numeric, for plotting): {output_csv_numeric}")
 print("sweep_type × split_mode distribution:")

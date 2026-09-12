@@ -7,9 +7,9 @@
 mkdir -p /vePFS-0x0d/home/zjm/tmp
 export TMPDIR=/vePFS-0x0d/home/zjm/tmp
 
-RESULTS_DIR="/root/zjm/cadt/results4"
+RESULTS_DIR="/vePFS-0x0d/home/zjm/cadt_regression/results4"
 DATA_DIR="/vePFS-0x0d/DailyEEG/processed_cadt_addtime_new"
-PLOT_SCRIPT="/root/zjm/cadt/plot_scatter.py"
+PLOT_SCRIPT="/vePFS-0x0d/home/zjm/cadt_regression/plot_scatter.py"
 LOG_FILE="${RESULTS_DIR}/batch_scatter_log.txt"
 
 # 清空日志
@@ -69,7 +69,7 @@ for dir in "$RESULTS_DIR"/*emotion*; do
         
         # 5. 执行散点图绘制脚本
         echo "  [执行] python $PLOT_SCRIPT ..." | tee -a "$LOG_FILE"
-        cd /root/zjm/cadt
+        cd /vePFS-0x0d/home/zjm/cadt_regression
         
         # 使用 eval 来正确处理可能包含空格的参数
         eval python "$PLOT_SCRIPT" \

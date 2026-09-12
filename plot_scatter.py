@@ -7,7 +7,7 @@ CADT 模型训练结果散点图绘制脚本（仅 Emotion Split 模式）
 import os
 import argparse
 
-_tmp_dir = "/root/zjm/cadt_test_code/tmp"
+_tmp_dir = "/vePFS-0x0d/home/zjm/cadt_regression/tmp"
 os.makedirs(_tmp_dir, exist_ok=True)
 os.environ["TMPDIR"] = _tmp_dir
 

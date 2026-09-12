@@ -14,10 +14,10 @@ import pandas as pd
 
 # ======================== 配置 ========================
 EXPERIMENTS = {
-    "CNN-Full":     "/root/zjm/cadt/result_day_td/tsize8",
-    "CNN-Ablation": "/root/zjm/cadt/result_day_td_ablation/tsize8",
-    "MLP-Full":     "/root/zjm/cadt/results_mlp",
-    "MLP-Ablation": "/root/zjm/cadt/results_mlp_ablation",
+    "CNN-Full":     "/vePFS-0x0d/home/zjm/cadt_regression/result_day_td/tsize8",
+    "CNN-Ablation": "/vePFS-0x0d/home/zjm/cadt_regression/result_day_td_ablation/tsize8",
+    "MLP-Full":     "/vePFS-0x0d/home/zjm/cadt_regression/results_mlp",
+    "MLP-Ablation": "/vePFS-0x0d/home/zjm/cadt_regression/results_mlp_ablation",
 }
 SPLIT_MODE = "within_subject_day"
 
@@ -194,7 +194,7 @@ for metric in PER_EMOTION_METRICS:
     print(df_emo.to_string(index=False))
 
 # ---- 3. 保存到 CSV ----
-output_dir = "/root/zjm/cadt_test_code"
+output_dir = "/vePFS-0x0d/home/zjm/cadt_regression"
 csv_overall = os.path.join(output_dir, "compare_ablation_overall.csv")
 df_overall.to_csv(csv_overall, index=False)
 print(f"\nSaved: {csv_overall}")

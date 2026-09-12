@@ -2,7 +2,7 @@
 脚本功能：为已有的实验结果添加每个情绪维度的 R2 指标和平均 R2
 
 使用方式：
-    python compute_per_dim_r2.py --result_dir /root/zjm/cadt/results4/20260727_013029_emotion_cross_day
+    python compute_per_dim_r2.py --result_dir /vePFS-0x0d/home/zjm/cadt_regression/results4/20260727_013029_emotion_cross_day
     
 参数说明：
     --result_dir: 实验结果目录，包含 model_best.pth, params.txt, results.txt
@@ -16,7 +16,7 @@ import numpy as np
 from scipy.stats import pearsonr, spearmanr
 
 # 添加 cadt 项目目录到 Python 路径
-sys.path.insert(0, '/root/zjm/cadt')
+sys.path.insert(0, '/vePFS-0x0d/home/zjm/cadt_regression')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import torch

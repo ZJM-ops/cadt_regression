@@ -97,7 +97,7 @@ class DailyEEG_SplitData(Dataset):
         data_train = DailyEEG_SplitData(train_indices, split_mode="cross_subject", data_dir=".../processed_cadt_addtime_new")
     """
     def __init__(self, sample_indices, split_mode="cross_subject",
-                 data_dir="/root/zjm/cadt_test_code/processed_cadt",
+                 data_dir="/vePFS-0x0d/home/zjm/cadt_regression/processed_cadt",
                  norm_mode="sample"):
         """
         Args:

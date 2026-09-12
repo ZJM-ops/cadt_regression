@@ -7,12 +7,14 @@
 #   保留 confusion_loss (L_conf) + domain_class_loss (L_dom) + 回归 + 对比 loss
 #
 # 自动循环三种划分模式: cross_subject / cross_day / within_subject_day
-# 结果保存到 /root/zjm/cadt/results_no_detach/{timestamp}_emotion_{split_mode}/
+# 结果保存到 /vePFS-0x0d/home/zjm/cadt_regression/results_no_detach/{timestamp}_emotion_{split_mode}/
+#
+# 多 seed 策略：每个 split_mode 跑 NUM_SEEDS 次（不固定 seed，纯重复），已成功的会计入并补齐
 #
 # 用法:
-#   bash /root/zjm/cadt/script/no_detach_ablation.sh                 # 跑全部 3 种模式
-#   bash /root/zjm/cadt/script/no_detach_ablation.sh cross_subject   # 只跑指定模式
-#   bash /root/zjm/cadt/script/no_detach_ablation.sh "cross_subject cross_day"  # 跑指定多个
+#   bash /vePFS-0x0d/home/zjm/cadt_regression/script/no_detach_ablation.sh                 # 跑全部 3 种模式
+#   bash /vePFS-0x0d/home/zjm/cadt_regression/script/no_detach_ablation.sh cross_subject   # 只跑指定模式
+#   bash /vePFS-0x0d/home/zjm/cadt_regression/script/no_detach_ablation.sh "cross_subject cross_day"  # 跑指定多个
 
 # ==================== 基础配置 ====================
 # 要运行的划分模式（空格分隔，可用命令行参数覆盖）
@@ -48,6 +50,9 @@ ABLATION="no_detach"
 # --- 结果目录 (用户指定) ---
 RESULT_BASE="results_no_detach"
 
+# --- 每个 split_mode 重复跑多少次（不固定 seed，纯重复实验） ---
+NUM_SEEDS=5
+
 # ==================== 逻辑 ====================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -65,7 +70,7 @@ MODE_ARRAY=(${SPLIT_MODES})
 TOTAL_RUNS=${#MODE_ARRAY[@]}
 
 echo "========================================"
-echo " No-Detach Ablation Experiment"
+echo " No-Detach Ablation Experiment (NUM_SEEDS=${NUM_SEEDS})"
 echo "========================================"
 echo " 划分模式: ${SPLIT_MODES} (共 ${TOTAL_RUNS} 个)"
 echo " 划分目录: ${SPLIT_DIR}"
@@ -80,37 +85,31 @@ echo " 结果目录: ${CADT_ROOT}/${RESULT_BASE}/"
 echo "========================================"
 echo ""
 
-# 检查某个 split_mode 是否已成功跑过 (params.txt + results.txt 都存在，且 ablation=no_detach)
-# 用法: already_done <split_mode>
-# 返回 0=已完成（跳过），1=未完成（需跑）
-already_done() {
+# 统计某个 split_mode 已成功跑过多少次 (params.txt + results.txt 都存在，且 ablation=no_detach)
+# 用法: count_done <split_mode>
+# 输出: 已成功次数（整数，0 表示没跑过）
+count_done() {
     local split_mode="$1"
     local base="${CADT_ROOT}/${RESULT_BASE}"
-    [ -d "${base}" ] || return 1
+    [ -d "${base}" ] || { echo 0; return; }
+    local count=0
     for d in "${base}"/*"_emotion_${split_mode}"; do
         [ -d "${d}" ] || continue
         local pm="${d}/params.txt"
         local rs="${d}/results.txt"
         [ -f "${pm}" ] && [ -f "${rs}" ] || continue
         if grep -q "^ablation: ${ABLATION}$" "${pm}"; then
-            return 0
+            count=$((count + 1))
         fi
     done
-    return 1
+    echo "${count}"
 }
 
-RUN_INDEX=0
-for MODE in "${MODE_ARRAY[@]}"; do
-    RUN_INDEX=$((RUN_INDEX + 1))
-    echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] split_mode=${MODE} ablation=${ABLATION}"
-
-    if already_done "${MODE}"; then
-        echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] 已跑过 (params.txt + results.txt 存在且 ablation=${ABLATION})，跳过"
-        echo ""
-        continue
-    fi
-
-    local_args=(
+# 用法: run_single_seed <split_mode>
+# 单次训练（不检查是否已跑过）
+run_single_seed() {
+    local split_mode="$1"
+    local args=(
         --x_dim "${X_DIM}"
         --n_targets 11
         --seq_len "${SEQ_LEN}"
@@ -124,7 +123,7 @@ for MODE in "${MODE_ARRAY[@]}"; do
         --discriminator_loss_weight "${DISC_WEIGHT}"
         --domain_cls_weight "${DOM_WEIGHT}"
         --contrast_tau "${TAU}"
-        --split_mode "${MODE}"
+        --split_mode "${split_mode}"
         --split_dir "${SPLIT_DIR}"
         --data_dir "${DATA_DIR}"
         --norm_mode "${NORM_MODE}"
@@ -132,11 +131,35 @@ for MODE in "${MODE_ARRAY[@]}"; do
         --result_base "${RESULT_BASE}"
     )
     if [ -n "${TARGET_SUBJECT_EMOTION}" ]; then
-        local_args+=(--target_subject "${TARGET_SUBJECT_EMOTION}")
+        args+=(--target_subject "${TARGET_SUBJECT_EMOTION}")
+    fi
+    python main.py "${args[@]}"
+}
+
+RUN_INDEX=0
+for MODE in "${MODE_ARRAY[@]}"; do
+    RUN_INDEX=$((RUN_INDEX + 1))
+    echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] split_mode=${MODE} ablation=${ABLATION}"
+
+    # 统计已成功次数，补齐到 NUM_SEEDS
+    done_count=$(count_done "${MODE}")
+    done_count=$(echo "${done_count}" | tr -d '[:space:]')
+    remaining=$((NUM_SEEDS - done_count))
+
+    echo ">>> 已成功 ${done_count}/${NUM_SEEDS}，补跑 ${remaining} 次"
+
+    if [ "${remaining}" -le 0 ]; then
+        echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] 已达 NUM_SEEDS=${NUM_SEEDS}，跳过"
+        echo ""
+        continue
     fi
 
-    python main.py "${local_args[@]}"
-    echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] split_mode=${MODE} done"
+    for i in $(seq 1 "${remaining}"); do
+        echo ""
+        echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] seed ${i}/${remaining} (补跑第 $((done_count + i)) 次)"
+        run_single_seed "${MODE}"
+        echo ">>> [${RUN_INDEX}/${TOTAL_RUNS}] seed ${i}/${remaining} done"
+    done
     echo ""
 done
 

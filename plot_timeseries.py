@@ -15,7 +15,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 
 # 将 cadt 项目根目录添加到 sys.path（model/ dataset 等模块在此目录下）
-sys.path.insert(0, '/root/zjm/cadt')
+sys.path.insert(0, '/vePFS-0x0d/home/zjm/cadt_regression')
 
 from model.CADT import CATDModel
 from dataset.dataset import DailyEEG_SplitData, load_emotion_split

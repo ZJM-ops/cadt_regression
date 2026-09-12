@@ -2,7 +2,7 @@
 # DailyEEG 情绪回归 + CADT 域适应测试脚本（仅 Emotion Split 模式）
 #
 # 用法:
-#   bash /root/zjm/cadt/script/dailyeeg_run.sh
+#   bash /vePFS-0x0d/home/zjm/cadt_regression/script/dailyeeg_run.sh
 #
 # 修改参数: 直接编辑下方的参数设置即可
 #
